@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhatsApp Bot</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 520px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.3rem; }
+  #status { font-weight: 600; margin-bottom: 1rem; }
+  #qr img { width: 260px; height: 260px; }
+  textarea { width: 100%; box-sizing: border-box; padding: .5rem; }
+  button { padding: .5rem 1rem; margin-top: .5rem; }
+  #log { margin-top: 1.5rem; border-top: 1px solid #ccc; padding-top: 1rem; }
+  .msg { background: #f1f1f1; border-radius: 6px; padding: .5rem; margin-bottom: .5rem; }
+  .msg small { color: #666; display: block; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #111; color: #eee; }
+    .msg { background: #222; } .msg small { color: #aaa; }
+  }
+</style>
+</head>
+<body>
+<h1>WhatsApp Bot</h1>
+<div id="status">Connecting…</div>
+<div id="qr"></div>
+
+<div id="sender" hidden>
+  <textarea id="text" rows="3" placeholder="Type a message…"></textarea>
+  <button id="send">Send</button>
+  <div id="result"></div>
+</div>
+
+<div id="log"><strong>Incoming messages</strong></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const $ = (id) => document.getElementById(id);
+
+socket.on('status', (s) => {
+  const labels = {
+    starting: 'Starting…',
+    qr: 'Scan this QR in WhatsApp → Linked devices',
+    ready: 'Connected ✔',
+    disconnected: 'Disconnected, reconnecting…',
+  };
+  $('status').textContent = labels[s] || s;
+  $('sender').hidden = s !== 'ready';
+  if (s === 'ready') $('qr').innerHTML = '';
+});
+
+socket.on('qr', (dataUrl) => {
+  $('qr').innerHTML = '<img alt="QR code" src="' + dataUrl + '">';
+});
+
+socket.on('incoming', (m) => {
+  const div = document.createElement('div');
+  div.className = 'msg';
+  const small = document.createElement('small');
+  small.textContent = m.from + ' · ' + new Date(m.time).toLocaleTimeString();
+  const body = document.createElement('span');
+  body.textContent = m.body;
+  div.append(small, body);
+  $('log').appendChild(div);
+});
+
+$('send').onclick = async () => {
+  const message = $('text').value;
+  const r = await fetch('/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, // add 'x-api-token' here if you set API_TOKEN
+    body: JSON.stringify({ message }),
+  });
+  const data = await r.json();
+  $('result').textContent = r.ok ? 'Sent ✔' : (data.error || 'Error');
+  if (r.ok) $('text').value = '';
+};
+</script>
+</body>
+</html>
